@@ -207,7 +207,7 @@ send_parallel_data:             ; r17 should contain the last word to transmit
     ldi     XL,LOW(sDataType)
     ldi     XH,HIGH(sDataType)
     st      X,r17               ; Update the last word in the buffer with the contents of r17
-    ldi     r16,0x0C            ; Delay before sending parallel data added to match original timing
+    ldi     r16,0x14            ; Delay before sending parallel data added to match original timing
 parallel_data_start_delay:    
     dec     r16
     brne    parallel_data_start_delay
@@ -234,12 +234,12 @@ initialize_buffer:              ; Set status bits in the buffer to match sStatus
     ldi     XH,HIGH(sBuffer)
     ldi     YL,LOW(sStatus)
     ldi     YH,HIGH(sStatus)
+    ld      r17,Y               ; Load sStatus into r17
 initialize_buffer_loop:
-    ld      r16,X               ; pointer to the buffer
-    ld      r17,Y               ; pointer to sStatus
-    or      r16,r17             ; 'or' in the status bytes
-    st      X+,r16              ; save and increment
-    cpi     XL,Low(sDataType)   ; done?
+    ld      r16,X               ; Load the byte from buffer into r16
+    or      r16,r17             ; 'or' in sStatus
+    st      X+,r16              ; Save and increment
+    cpi     XL,Low(sDataType+1) ; Done?
     brne    initialize_buffer_loop
     ret
 
@@ -411,14 +411,14 @@ data_valid_delay_2:             ; Delay between last falling clk and D4 high
     cpi     r17,0x05
     brne    data_valid_delay_2
 tx_last_word:
-    ldi     r16,0x00            ; Clear r16
-    ld      r17,Y               ; Pointer to sStatus was set in initialize_buffer
-    or      r16,r17             ; Bring in the status bits
     eor     r17,r17
 tx_last_word_delay:             ; Delay before start of data_valid
     inc     r17
     cpi     r17,0x02
     brne    tx_last_word_delay
+    ldi     r16,0x00            ; Clear r16
+    ld      r17,Y               ; Pointer to sStatus was set in initialize_buffer
+    or      r16,r17             ; Bring in the status bits
     out     PORTD,r16
     ori     r16,0x20            ; Set `data_valid` high
     out     PORTD,r16           
@@ -460,7 +460,7 @@ fm_cal_delay_1:
     eor     r16,r16             ; Clock/Prescaler comination don't have enough resolution
 fm_cal_delay_2:                 ; Extra delay before clearing `B+C H`
     inc     r16
-    cpi     r16,0x2e            ; was 2e
+    cpi     r16,0x2e            ;
     brne    fm_cal_delay_2
     cbi     PORTB,1             ; Clear PB1 `B+C H`
     eor     r16,r16             ; Clock/Prescaler comination don't have enough resolution
@@ -589,6 +589,7 @@ halt:
 
                                         ;PB0 TP24 CLK fm_enable
                                         ;PB1 TP25 DSA B+C L (start_stop)
+                                        ;OOL is LOW when LED is lit
 
                                         ;PIN            NORMAL      ALTERNATE   Condition
                                         ;1(VSS)         0000        ----        ---
@@ -669,7 +670,10 @@ bit_shift_loop:                 ; Walk a bit through PORTD
     clr     r16
     in      r16,PINF            ; Load PORTF into r16
     andi    r16,0xF0            ; Clear the unused bits at the top half
-    ;swap    r16                 ; swap the nibbles
+    lsr     r16
+    lsr     r16
+    lsr     r16
+    lsr     r16
     out     PORTD,r16           ; output the contents of PORTF onto PORTD0:3
     call    dsa_clock
     clr     r16
